@@ -6,13 +6,21 @@ function setBadgeText(enabled){
 }
 
 const input = document.getElementById("analyze")
+const website_button = document.getElementById("redirect_to_website");
+const website_box = document.getElementById("website_box");
+const analyze_box = document.getElementById("analyze_box");
 
 let rgb_color = "rgb_box"
 const scoreCard = `
 <div class="rgb_box" style="position: relative; left: 10px; top: 20px;">
-    <div style="position: relative; left: 25px; top: 22px">
+    <div style="position: relative; left: 25px;">
         <h1 style="position: relative; left: 12px; text-decoration: underline;">Score:</h1>
-        <div id = "average_score" style="position: relative; left: 30px; font-weight: bold; font-size: 40px;">Please Press The Analyze Button</div>
+        <section class="flex-container" style="position: relative; right: 17px">
+            <div id="average_score" style="position: relative; left: 30px; font-weight: bold; font-size: 40px;">0</div>
+            <div style="position: relative; right: 10px; font-weight: bold; font-size: 40px;">/5</div>
+        </section>
+        <div id="worded_score_top" style="position: relative; left: 5px; top: 8px; font-weight: bold; font-size: 20px;">Loading</div>
+        <div id="worded_score_bottom" style="position: relative; left: 23px; top: 8px; font-weight: bold; font-size: 20px;"></div>
     </div>
 </div>`;
 
@@ -45,6 +53,8 @@ const redInfoReportCard = `
     </div>
 </div>
 `;
+
+//Deeper Analysis:
 const reportSections = document.querySelectorAll("section");
 const reportSection = reportSections[reportSections.length - 1];
 const scoreSection = reportSections[0];
@@ -56,7 +66,12 @@ input.addEventListener("click", async () => {
         if(!hasScoreCard){
             //style="position:relative; left: 50px"
             scoreSection.insertAdjacentHTML('afterbegin', scoreCard)
-            scoreSection.style.marginLeft = "200px";
+            analyze_box.style.position = 'relative'
+            website_box.style.position = 'relative'
+
+            analyze_box.style.right = '200px'
+            website_box.style.left = '18px'
+            //scoreSection.style.marginLeft = "200px";
             hasScoreCard = true;
         }
     }
@@ -64,13 +79,25 @@ input.addEventListener("click", async () => {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab?.id) return;
     try {
+        //pdfjsLib
         const response = await chrome.tabs.sendMessage(tab.id, { type: "analyze" });
         //showResults(response);
         portrayData(response.average, response.elements);
     } catch (err) {
+        const div = document.getElementById("average_score")
+        const worded_div_top = document.getElementById("worded_score_top");
+
+        div.style.color = "#000000";
+        rgb_color = "rgb_box_green_score_box";
+        worded_div_top.innerHTML = "Invalid";
+        worded_div_top.style.left = '15px'
         console.log("Could not reach the page:", err);
     }
 })
+
+website_button.addEventListener("click", async() => {
+    window.open("https://fineprint-agreement-c7mf.bolt.host/", "_blank", "noopener,noreferrer");
+});
 
 /*
 chrome.storage.onChanged.addListener((changes, areaName) => {
@@ -167,19 +194,51 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
 
 function portrayData(text, ELEMENT_WEIGHT){
     const div = document.getElementById("average_score")
+    const worded_div_top = document.getElementById("worded_score_top");
+    const worded_div_bottom = document.getElementById("worded_score_bottom");
     div.innerHTML = text
     if(parseInt(text) >= 4){
         div.style.color = "#ff1e00";
         rgb_color = "rgb_box_red_score_box";
+        worded_div_top.innerHTML = "High";
+        worded_div_bottom.innerHTML = "Risk";
+        worded_div_top.style.color = "#ff1e00";
+        worded_div_bottom.style.color = "#ff1e00";
+
+        worded_div_top.style.position = 'relative'
+        worded_div_bottom.style.position = 'relative'
+
+        worded_div_top.style.left = '21px'
+        worded_div_bottom.style.left = '23px'
     }
     else if(parseInt(text) >= 2){
-        div.style.color = "#fff700";
+        div.style.color = "#dbdb00ff";
         rgb_color = "rgb_box_yellow_score_box";
+        worded_div_top.innerHTML = "Medium";
+        worded_div_bottom.innerHTML = "Risk";
+        worded_div_top.style.color = "#dbdb00ff";
+        worded_div_bottom.style.color = "#dbdb00ff";
+        worded_div_top.style.left = '5px'
+        worded_div_bottom.style.left = '23px'
+    }
+    else if(parseInt(text) != 0){
+        div.style.color = "#0ec605ff";
+        rgb_color = "rgb_box_green_score_box";
+        worded_div_top.innerHTML = "Low";
+        worded_div_bottom.innerHTML = "Risk";
+        worded_div_top.style.color = "#0ec605ff";
+        worded_div_bottom.style.color = "#0ec605ff";
+        worded_div_top.style.left = '24px'
+        worded_div_bottom.style.left = '23px'
     }
     else {
-        div.style.color = "#0dff00";
+        div.style.color = "#000000";
         rgb_color = "rgb_box_green_score_box";
+        worded_div_top.innerHTML = "Invalid";
+        worded_div_top.style.left = '15px'
+        return;
     }
+    
     let card = document.querySelector(".rgb_box");
     for(let i = 0; i < 3 && !card; i++){
         if(i === 0){
@@ -208,9 +267,9 @@ function portrayData(text, ELEMENT_WEIGHT){
     const map = new Map(ELEMENT_WEIGHT)
 
     if(!createdCards){
-        reportSection.insertAdjacentHTML('afterbegin', redInfoReportCard)
-        reportSection.insertAdjacentHTML('afterbegin', yellowInfoReportCard)
         reportSection.insertAdjacentHTML('afterbegin', greenInfoReportCard)
+        reportSection.insertAdjacentHTML('afterbegin', yellowInfoReportCard)
+        reportSection.insertAdjacentHTML('afterbegin', redInfoReportCard)
         createdCards = true;
     }
 

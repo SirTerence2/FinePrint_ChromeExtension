@@ -1,5 +1,7 @@
 "use strict"
-console.log("content.js loaded")
+
+//import * as pdfjsLib from './src/pdf.min.mjs';
+//pdfjsLib.GlobalWorkerOptions.workerSrc = './src/pdf.worker.min.mjs';
 
 const highlightFilterLow = 'rgba(152, 245, 152, 0.92)'
 const highlightFilterMedium = 'rgba(241, 241, 131, 0.88)'
@@ -126,20 +128,81 @@ const observer = new MutationObserver((mutations) => {
     })
 })
 
+//let allText = [];
+let analyzed = false;
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if(message.type !== "analyze"){
+    if(message.type !== "analyze" || analyzed){
         return
     }
-    observer.observe(document, {
-        attributes: false,
-        characterData: true,
-        childList: true,
-        subtree: true,
-    })
-    processNode(document)
-    const average = highlightedElements > 0 ? Math.ceil(totalWeight / highlightedElements) : 0
-    //chrome.storage.sync.set({ text: average, time: Date.now() })
-    //chrome.storage.local.set({ ELEMENT_WEIGHT: Array.from(ELEMENT_WEIGHT), time: Date.now()})
-    sendResponse({average: average, elements: Array.from(ELEMENT_WEIGHT)});
-    //adjust the popup html file to include the average weights
+    analyzed = true;
+    (async() => {
+        try{
+            const currentUrl = window.location.href;
+            let allText = await extractPDFText(currentUrl);
+            for(const sentence of allText){
+                let simplified = sentence.toLowerCase()
+                for(const [category, phrases] of Object.entries(CATEGORIES)) {
+                    for(const phrase of phrases){
+                        if(simplified.includes(phrase)){
+                            if(ELEMENT_WEIGHT.has(sentence)){
+                                const pastWeight = ELEMENT_WEIGHT.get(category);
+                                if(CATEGORY_WEIGHTS[category] > pastWeight){
+                                    ELEMENT_WEIGHT.set(sentence, CATEGORY_WEIGHTS[category]);
+                                }
+                            }
+                            else {
+                                ELEMENT_WEIGHT.set(sentence, CATEGORY_WEIGHTS[category]);
+                            }
+                        }
+                    }
+                }
+            }
+            for(const [sentence, weight] of ELEMENT_WEIGHT) {
+                highlightedElements++;
+                totalWeight += weight;
+            }
+            //const average = highlightedElements > 0 ? Math.ceil(totalWeight / highlightedElements) : 0
+            const average = highlightedElements > 0 ? Math.ceil(totalWeight / highlightedElements) : 0
+            sendResponse({average: average, elements: Array.from(ELEMENT_WEIGHT)});
+            analyzed = false;
+        }
+        catch(error){
+            observer.observe(document, {
+                attributes: false,
+                characterData: true,
+                childList: true,
+                subtree: true,
+            })
+            processNode(document)
+            const average = highlightedElements > 0 ? Math.ceil(totalWeight / highlightedElements) : 0
+            sendResponse({average: average, elements: Array.from(ELEMENT_WEIGHT)});
+            analyzed = false;
+        }
+    })();
+    return true;
 })
+
+async function extractPDFText(url){
+    //pdf.min.mjs
+    //pdf.worker.min.mjs
+    const pdfJsUrl = chrome.runtime.getURL('pdf.min.mjs');
+    //chrome-extension://gmgfdehapgihagmainliaopidndkhojl/pdf.min.mjs
+    //chrome-extension://gmgfdehapgihagmainliaopidndkhojl/pdf.worker.min.mjs
+    const workerUrl = chrome.runtime.getURL('pdf.worker.min.mjs');
+
+    const pdfjsLib = await import(pdfJsUrl);
+    pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
+
+    const loadingTask = pdfjsLib.getDocument({url});
+    const pdf = await loadingTask.promise;
+    let allPDFText = "";
+    for(let i = 1; i <= pdf.numPages; i++){
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+
+        const pageString = content.items.filter((item) => 'str' in item).map((item) => item.str + (item.hasEOL ? '\n' : ' ')).join('').trim();
+        allPDFText += pageString + '\n';
+        page.cleanup();
+    }
+    return allPDFText.split(/(?<=[.!?])\s+/);
+}
