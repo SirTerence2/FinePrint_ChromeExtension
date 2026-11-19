@@ -6,8 +6,8 @@ function setBadgeText(enabled){
 }
 
 const input = document.getElementById("analyze")
-const website_button = document.getElementById("redirect_to_website");
-const website_box = document.getElementById("website_box");
+let website_button = document.getElementById("redirect_to_website");
+let website_box = document.getElementById("website_box");
 const analyze_box = document.getElementById("analyze_box");
 
 let rgb_color = "rgb_box"
@@ -54,6 +54,16 @@ const redInfoReportCard = `
 </div>
 `;
 
+const websiteCard = `
+<div class="rgb_box_red_website_box" style="position: relative; right: 180px;">
+    <div id="website_box" style="position: relative; left: 25px;">
+        <h3 style="position: relative; left: 35px; font-size:28px;">Want a</h3>
+        <h3 style="position: relative; left: 15px; bottom: 30px; text-decoration: underline; font-size:20px; color: #8B0000;">Deeper Analysis?</h3>
+        <button id="redirect_to_website" class="btn" style="position: relative; right: 5px; bottom: 18px; color: #000000;">Visit Our Website!</button>
+    </div>
+</div>
+`;
+
 //Deeper Analysis:
 const reportSections = document.querySelectorAll("section");
 const reportSection = reportSections[reportSections.length - 1];
@@ -61,19 +71,28 @@ const scoreSection = reportSections[0];
 
 let hasScoreCard = false;
 let createdCards = false;
+let createdWebsiteCard = false;
 let text = "";
 input.addEventListener("click", async () => {
     if(scoreSection){
         if(!hasScoreCard){
-            //style="position:relative; left: 50px"
             scoreSection.insertAdjacentHTML('afterbegin', scoreCard)
             analyze_box.style.position = 'relative'
-            website_box.style.position = 'relative'
-
             analyze_box.style.right = '200px'
-            website_box.style.left = '18px'
-            //scoreSection.style.marginLeft = "200px";
             hasScoreCard = true;
+        }
+        if(!createdWebsiteCard){
+            scoreSection.insertAdjacentHTML('beforeend', websiteCard);
+            website_box = document.getElementById("website_box");
+            website_button = document.getElementById("redirect_to_website");
+            website_button.addEventListener("click", async() => {
+                if(text !== ""){
+                    chrome.runtime.sendMessage({type: "openWindow", text});
+                }
+            });
+            website_box.style.position = 'relative'
+            website_box.style.left = '18px'
+            createdWebsiteCard = true;
         }
     }
     //void chrome.storage.sync.set({"analyze": Date.now()})
@@ -101,12 +120,6 @@ input.addEventListener("click", async () => {
         console.log("Could not reach the page:", err);
     }
 })
-
-website_button.addEventListener("click", async() => {
-    if(text !== ""){
-        chrome.runtime.sendMessage({type: "openWindow", text});
-    }
-});
 
 /*
 chrome.storage.onChanged.addListener((changes, areaName) => {
