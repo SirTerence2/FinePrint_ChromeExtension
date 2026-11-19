@@ -60,12 +60,26 @@ function processNode(node){
                         //calculateWeight(mark, category)
                         highlightElement(mark, category)
                         mark.textContent = sentence
-                        ELEMENT_WEIGHT.set(mark.textContent, CATEGORY_WEIGHTS[category]);
+                        if(ELEMENT_WEIGHT.has(sentence)){
+                            const pastWeight = ELEMENT_WEIGHT.get(sentence);
+                            if(CATEGORY_WEIGHTS[category] > pastWeight){
+                                ELEMENT_WEIGHT.set(sentence, CATEGORY_WEIGHTS[category]);
+                            }
+                        }
+                        else {
+                            ELEMENT_WEIGHT.set(sentence, CATEGORY_WEIGHTS[category]);
+                        }
+                        //ELEMENT_WEIGHT.set(sentence, CATEGORY_WEIGHTS[category]);
                         if(!foundPhrase){
                             fragment.appendChild(mark)
                         }
                         foundPhrase = true;
                         shouldSwap = true;
+                    }
+                    else {
+                        if(!ELEMENT_WEIGHT.has(sentence)){
+                            ELEMENT_WEIGHT.set(sentence, 0);
+                        }
                     }
                 }
             }
@@ -82,36 +96,17 @@ function processNode(node){
 function highlightElement(elem, category){
     let weight = CATEGORY_WEIGHTS[category];
     if(weight === 5){
-        let previousColor = elem.style.backgroundColor;
-        if(previousColor === highlightFilterMedium){
-            totalWeight -= 3;
-            highlightedElements--
-        }
-        if(previousColor === highlightFilterLow){
-            totalWeight -= 1;
-            highlightedElements--
-        }
-        totalWeight += weight
-        highlightedElements++
         elem.style.backgroundColor = highlightFilterHigh
     }
     else if(weight === 3){
         let previousColor = elem.style.backgroundColor;
         if(previousColor !== highlightFilterHigh){
-            if(previousColor === highlightFilterLow){
-                totalWeight -= 1;
-                highlightedElements--
-            }
-            totalWeight += weight
-            highlightedElements++
             elem.style.backgroundColor = highlightFilterMedium
         }
     }
     else {
         let previousColor = elem.style.backgroundColor;
         if(previousColor !== highlightFilterHigh && previousColor !== highlightFilterMedium){
-            totalWeight += weight
-            highlightedElements++
             elem.style.backgroundColor = highlightFilterLow
         }
     }
@@ -137,6 +132,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     analyzed = true;
     (async() => {
         try{
+            //ELEMENT_WEIGHT.clear();
             const currentUrl = window.location.href;
             let allText = await extractPDFText(currentUrl);
             for(const sentence of allText){
@@ -145,7 +141,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     for(const phrase of phrases){
                         if(simplified.includes(phrase)){
                             if(ELEMENT_WEIGHT.has(sentence)){
-                                const pastWeight = ELEMENT_WEIGHT.get(category);
+                                const pastWeight = ELEMENT_WEIGHT.get(sentence);
                                 if(CATEGORY_WEIGHTS[category] > pastWeight){
                                     ELEMENT_WEIGHT.set(sentence, CATEGORY_WEIGHTS[category]);
                                 }
@@ -154,12 +150,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                                 ELEMENT_WEIGHT.set(sentence, CATEGORY_WEIGHTS[category]);
                             }
                         }
+                        else {
+                            if(!ELEMENT_WEIGHT.has(sentence)){
+                                ELEMENT_WEIGHT.set(sentence, 0);
+                            }
+                        }
                     }
                 }
             }
             for(const [sentence, weight] of ELEMENT_WEIGHT) {
-                highlightedElements++;
-                totalWeight += weight;
+                if(weight !== 0){
+                    highlightedElements++;
+                    totalWeight += weight;
+                }
             }
             //const average = highlightedElements > 0 ? Math.ceil(totalWeight / highlightedElements) : 0
             const average = highlightedElements > 0 ? Math.ceil(totalWeight / highlightedElements) : 0
@@ -167,6 +170,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             analyzed = false;
         }
         catch(error){
+            //ELEMENT_WEIGHT.clear();
             observer.observe(document, {
                 attributes: false,
                 characterData: true,
@@ -174,6 +178,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 subtree: true,
             })
             processNode(document)
+
+            for(const [sentence, weight] of ELEMENT_WEIGHT) {
+                if(weight !== 0){
+                    highlightedElements++;
+                    totalWeight += weight;
+                }
+            }
             const average = highlightedElements > 0 ? Math.ceil(totalWeight / highlightedElements) : 0
             sendResponse({average: average, elements: Array.from(ELEMENT_WEIGHT)});
             analyzed = false;

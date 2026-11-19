@@ -61,6 +61,7 @@ const scoreSection = reportSections[0];
 
 let hasScoreCard = false;
 let createdCards = false;
+let text = "";
 input.addEventListener("click", async () => {
     if(scoreSection){
         if(!hasScoreCard){
@@ -83,6 +84,12 @@ input.addEventListener("click", async () => {
         const response = await chrome.tabs.sendMessage(tab.id, { type: "analyze" });
         //showResults(response);
         portrayData(response.average, response.elements);
+        const map = new Map(response.elements)
+        text = "";
+        for (const [element, count] of map) {
+            text += element
+            text += '\n'
+        }
     } catch (err) {
         const div = document.getElementById("average_score")
         const worded_div_top = document.getElementById("worded_score_top");
@@ -96,7 +103,9 @@ input.addEventListener("click", async () => {
 })
 
 website_button.addEventListener("click", async() => {
-    window.open("https://fineprint-agreement-c7mf.bolt.host/", "_blank", "noopener,noreferrer");
+    if(text !== ""){
+        chrome.runtime.sendMessage({type: "openWindow", text});
+    }
 });
 
 /*
@@ -282,17 +291,17 @@ function portrayData(text, ELEMENT_WEIGHT){
     greenUlElement.replaceChildren();
 
     for (const [element, count] of map) {
-        if(count == 5){
+        if(count === 5){
             const redLi = document.createElement('li');
             redLi.textContent = element;
             redUlElement.appendChild(redLi);
         }
-        else if(count == 3){
+        else if(count === 3){
             const yellowLi = document.createElement('li');
             yellowLi.textContent = element;
             yellowUlElement.appendChild(yellowLi);
         }
-        else {
+        else if(count === 1){
             const greenLi = document.createElement('li');
             greenLi.textContent = element;
             greenUlElement.appendChild(greenLi);

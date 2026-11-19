@@ -7,7 +7,11 @@
         "default_popup": "popup.html"
     },
     "permissions": [
-        "storage"
+        "storage",
+        "scripting"
+    ],
+    "host_permissions": [
+      "https://fineprint-agreement-c7mf.bolt.host/*"
     ],
     "content_scripts": [
         {
